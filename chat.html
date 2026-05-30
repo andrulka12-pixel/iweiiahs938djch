@@ -48,7 +48,7 @@
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            background-color: #e0e0e0; /* Возвращён серый цвет для человечка */
+            background-color: #e0e0e0;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -87,11 +87,11 @@
             color: #757575;
         }
 
-        /* Настройка никнейма в шапке */
+        /* Настройка никнейма в шапке со сдвигом влево */
         .nickname-box {
             display: flex;
             align-items: center;
-            gap: 12px;
+            margin-right: 100px; /* Сдвиг влево на 100 пикселей */
         }
 
         .nickname-input {
@@ -100,7 +100,7 @@
             border-radius: 20px;
             font-size: 13px;
             outline: none;
-            width: 140px;
+            width: 150px;
             background-color: #f9f9f9;
             font-weight: 500;
         }
@@ -108,22 +108,6 @@
         .nickname-input:focus {
             border-color: #248bf2;
             background-color: #ffffff;
-        }
-
-        .exit-btn {
-            background-color: #f1f3f4;
-            color: #3c4043;
-            border: none;
-            padding: 8px 20px;
-            border-radius: 20px;
-            font-size: 14px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: background 0.2s;
-        }
-
-        .exit-btn:hover {
-            background-color: #e8eaed;
         }
 
         /* Область сообщений в стиле Telegram */
@@ -255,13 +239,13 @@
             </div>
             <div class="meta-text">
                 <span class="title">General</span>
-                <span class="subtitle" id="member-count">Участников </span>
+                <span class="subtitle" id="member-count">Участников: 0</span>
             </div>
         </div>
 
         <div class="nickname-box">
-            <input type="text" id="nick-field" class="nickname-input" placeholder="Ваш nickname...">
-            </div>
+            <input type="text" id="nick-field" class="nickname-input" placeholder="Your nickname...">
+        </div>
     </div>
 
     <div class="chat-container" id="chat-box"></div>
@@ -285,13 +269,48 @@
         const memberCountLabel = document.getElementById('member-count');
         const sendButton = document.getElementById('send-button');
 
-        // Функция генерации рандомного уникального никнейма при входе
-        function generateRandomNickname() {
-            const randomNumber = Math.floor(1000 + Math.random() * 9000); // Генерирует 4 цифры от 1000 до 9999
-            nickField.value = `User_${randomNumber}`;
+        let savedMessages = [];
+
+        // Получение или генерация постоянного никнейма
+        function initNickname() {
+            const savedNick = localStorage.getItem('chatter_username');
+            if (savedNick) {
+                nickField.value = savedNick;
+            } else {
+                const randomNumber = Math.floor(1000 + Math.random() * 9000);
+                const newNick = `User_${randomNumber}`;
+                nickField.value = newNick;
+                localStorage.setItem('chatter_username', newNick);
+            }
         }
 
-        // 1. Отправка сообщения
+        // Сохранение ника при ручном изменении
+        nickField.addEventListener('input', () => {
+            const currentNick = nickField.value.trim() || "User";
+            localStorage.setItem('chatter_username', currentNick);
+        });
+
+        // Загрузка сохраненных сообщений
+        function loadSavedMessages() {
+            const localData = localStorage.getItem('chatter_chat_history');
+            if (localData) {
+                savedMessages = JSON.parse(localData);
+                savedMessages.forEach(msg => {
+                    renderBubble(msg.name, msg.text, msg.time, false);
+                });
+            }
+        }
+
+        // Сохранение в память
+        function saveMessageToLocal(name, text, time) {
+            savedMessages.push({ name, text, time });
+            if (savedMessages.length > 50) {
+                savedMessages.shift();
+            }
+            localStorage.setItem('chatter_chat_history', JSON.stringify(savedMessages));
+        }
+
+        // Отправка сообщения
         async function sendMessage() {
             const text = msgField.value.trim();
             const nickname = nickField.value.trim() || "User";
@@ -299,10 +318,8 @@
             if (!text) return;
             msgField.value = '';
 
-            // Отображаем локально
             appendMessage(nickname, text);
 
-            // Шлём веб-хук в Дискорд
             try {
                 await fetch(webhookUrl, {
                     method: 'POST',
@@ -317,12 +334,13 @@
             }
         }
 
-        // Синхронизация между вкладками браузера
+        // Синхронизация между вкладками
         const chatChannel = new BroadcastChannel('chatter_chat_bridge');
         
         chatChannel.onmessage = (event) => {
             const { name, text, time } = event.data;
             renderBubble(name, text, time, false);
+            saveMessageToLocal(name, text, time);
         };
 
         function appendMessage(author, text) {
@@ -330,18 +348,15 @@
             const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             
             renderBubble(author, text, timeStr, true);
+            saveMessageToLocal(author, text, timeStr);
             
-            // Передаем сообщение на все остальные вкладки
             chatChannel.postMessage({ name: author, text: text, time: timeStr });
         }
 
-        // Функция отрисовки бабла
+        // Рендер бабла
         function renderBubble(author, text, time, isFromThisWindow) {
             const bubble = document.createElement('div');
             const currentNick = nickField.value.trim() || "User";
-            
-            // Если сообщение отправлено из ЭТОЙ вкладки — оно всегда "твоё" (справа)
-            // Если прилетело из другой вкладки, проверяем по никнейму
             const isMe = isFromThisWindow || (author === currentNick);
 
             bubble.className = `message-bubble ${isMe ? 'my-message' : ''}`;
@@ -356,7 +371,7 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // 2. Получение количества участников сервера из Discord
+        // Получение количества участников из Discord
         async function updateMemberCount() {
             try {
                 const response = await fetch(`https://discord.com/api/guilds/${discordServerId}/widget.json`);
@@ -369,16 +384,15 @@
             }
         }
 
-        // Клик по кнопке "Самолетик"
         sendButton.addEventListener('click', sendMessage);
 
-        // Отправка по Enter
         msgField.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') sendMessage();
         });
 
-        // Старт системы
-        generateRandomNickname(); // Генерируем уникальный ник при старте
+        // Инициализация
+        initNickname();
+        loadSavedMessages();
         updateMemberCount();
         setInterval(updateMemberCount, 15000); 
     </script>
