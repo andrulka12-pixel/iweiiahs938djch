@@ -87,11 +87,11 @@
             color: #757575;
         }
 
-        /* Настройка никнейма в шапке со сдвигом влево */
+        /* Настройка никнейма в шапке (сдвиг уменьшен на 20px) */
         .nickname-box {
             display: flex;
             align-items: center;
-            margin-right: 100px; /* Сдвиг влево на 100 пикселей */
+            margin-right: 80px; 
         }
 
         .nickname-input {
@@ -239,7 +239,7 @@
             </div>
             <div class="meta-text">
                 <span class="title">General</span>
-                <span class="subtitle" id="member-count">Участников: 0</span>
+                <span class="subtitle" id="member-count">Участников 0</span>
             </div>
         </div>
 
@@ -269,45 +269,10 @@
         const memberCountLabel = document.getElementById('member-count');
         const sendButton = document.getElementById('send-button');
 
-        let savedMessages = [];
-
-        // Получение или генерация постоянного никнейма
+        // Генерация случайного никнейма при каждом входе без сохранения в память
         function initNickname() {
-            const savedNick = localStorage.getItem('chatter_username');
-            if (savedNick) {
-                nickField.value = savedNick;
-            } else {
-                const randomNumber = Math.floor(1000 + Math.random() * 9000);
-                const newNick = `User_${randomNumber}`;
-                nickField.value = newNick;
-                localStorage.setItem('chatter_username', newNick);
-            }
-        }
-
-        // Сохранение ника при ручном изменении
-        nickField.addEventListener('input', () => {
-            const currentNick = nickField.value.trim() || "User";
-            localStorage.setItem('chatter_username', currentNick);
-        });
-
-        // Загрузка сохраненных сообщений
-        function loadSavedMessages() {
-            const localData = localStorage.getItem('chatter_chat_history');
-            if (localData) {
-                savedMessages = JSON.parse(localData);
-                savedMessages.forEach(msg => {
-                    renderBubble(msg.name, msg.text, msg.time, false);
-                });
-            }
-        }
-
-        // Сохранение в память
-        function saveMessageToLocal(name, text, time) {
-            savedMessages.push({ name, text, time });
-            if (savedMessages.length > 50) {
-                savedMessages.shift();
-            }
-            localStorage.setItem('chatter_chat_history', JSON.stringify(savedMessages));
+            const randomNumber = Math.floor(1000 + Math.random() * 9000);
+            nickField.value = `User_${randomNumber}`;
         }
 
         // Отправка сообщения
@@ -334,13 +299,12 @@
             }
         }
 
-        // Синхронизация между вкладками
+        // Синхронизация между вкладками/фреймами
         const chatChannel = new BroadcastChannel('chatter_chat_bridge');
         
         chatChannel.onmessage = (event) => {
             const { name, text, time } = event.data;
             renderBubble(name, text, time, false);
-            saveMessageToLocal(name, text, time);
         };
 
         function appendMessage(author, text) {
@@ -348,7 +312,6 @@
             const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             
             renderBubble(author, text, timeStr, true);
-            saveMessageToLocal(author, text, timeStr);
             
             chatChannel.postMessage({ name: author, text: text, time: timeStr });
         }
@@ -371,16 +334,16 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // Получение количества участников из Discord
+        // Получение количества участников из Discord Widget
         async function updateMemberCount() {
             try {
                 const response = await fetch(`https://discord.com/api/guilds/${discordServerId}/widget.json`);
                 const data = await response.json();
                 if (data && data.presence_count !== undefined) {
-                    memberCountLabel.textContent = `Участников: ${data.presence_count}`;
+                    memberCountLabel.textContent = `Участников ${data.presence_count}`;
                 }
             } catch (e) {
-                memberCountLabel.textContent = "Участников: 1";
+                memberCountLabel.textContent = "Участников 1";
             }
         }
 
@@ -390,9 +353,8 @@
             if (e.key === 'Enter') sendMessage();
         });
 
-        // Инициализация
+        // Инициализация скриптов
         initNickname();
-        loadSavedMessages();
         updateMemberCount();
         setInterval(updateMemberCount, 15000); 
     </script>
