@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatter Chat Bridge</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body, html {
+            height: 100%;
+            background-color: #f0f2f5;
+            color: #000000;
+            overflow: hidden;
+        }
+
+        /* Шапка чата */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 15px;
+            border-bottom: 1px solid #e2e8f0;
+            height: 60px;
+            background-color: #ffffff;
+            position: relative;
+            z-index: 10;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .avatar-container {
+            position: relative;
+            width: 40px;
+            height: 40px;
+        }
+
+        .avatar {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background-color: #e0e0e0; /* Возвращён серый цвет для человечка */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .avatar svg {
+            width: 24px;
+            height: 24px;
+            fill: #757575;
+        }
+
+        .status-dot {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 12px;
+            height: 12px;
+            background-color: #4caf50;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+        }
+
+        .meta-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #000000;
+        }
+
+        .subtitle {
+            font-size: 13px;
+            color: #757575;
+        }
+
+        /* Настройка никнейма в шапке */
+        .nickname-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nickname-input {
+            padding: 8px 14px;
+            border: 1px solid #e0e0e0;
+            border-radius: 20px;
+            font-size: 13px;
+            outline: none;
+            width: 140px;
+            background-color: #f9f9f9;
+            font-weight: 500;
+        }
+
+        .nickname-input:focus {
+            border-color: #248bf2;
+            background-color: #ffffff;
+        }
+
+        .exit-btn {
+            background-color: #f1f3f4;
+            color: #3c4043;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .exit-btn:hover {
+            background-color: #e8eaed;
+        }
+
+        /* Область сообщений в стиле Telegram */
+        .chat-container {
+            height: calc(100% - 130px);
+            overflow-y: auto;
+            padding: 20px 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background-color: #e7ebf0;
+        }
+
+        /* Стиль бабла сообщения */
+        .message-bubble {
+            max-width: 75%;
+            background-color: #ffffff;
+            padding: 8px 14px;
+            border-radius: 12px 12px 12px 0px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.07);
+            align-self: flex-start;
+            position: relative;
+            word-wrap: break-word;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Зеленый бабл для отправляющего пользователя */
+        .message-bubble.my-message {
+            background-color: #eeffde;
+            border-radius: 12px 12px 0px 12px;
+            align-self: flex-end;
+        }
+
+        .author-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: #2b73b3;
+            margin-bottom: 3px;
+        }
+
+        .message-text {
+            font-size: 15px;
+            line-height: 1.4;
+            color: #000000;
+            padding-right: 45px;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: #a3a3a3;
+            position: absolute;
+            bottom: 4px;
+            right: 8px;
+            user-select: none;
+        }
+
+        /* Поле ввода внизу */
+        .input-area {
+            height: 70px;
+            padding: 10px 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background-color: #ffffff;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .message-input-wrapper {
+            flex-grow: 1;
+        }
+
+        .main-input {
+            width: 100%;
+            padding: 12px 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 15px;
+            outline: none;
+            background-color: #f1f3f4;
+        }
+
+        .main-input:focus {
+            border-color: #cbd5e1;
+            background-color: #ffffff;
+        }
+
+        /* Кнопка Отправить */
+        .send-btn {
+            background-color: #248bf2;
+            color: #ffffff;
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s, transform 0.1s;
+            flex-shrink: 0;
+        }
+
+        .send-btn:hover {
+            background-color: #1a73e8;
+        }
+
+        .send-btn:active {
+            transform: scale(0.95);
+        }
+
+        .send-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: #ffffff;
+            margin-left: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="user-info">
+            <div class="avatar-container">
+                <div class="avatar">
+                    <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5-4-8-4z"/></svg>
+                </div>
+                <div class="status-dot"></div>
+            </div>
+            <div class="meta-text">
+                <span class="title">chatter chat</span>
+                <span class="subtitle" id="member-count">Участников: ...</span>
+            </div>
+        </div>
+
+        <div class="nickname-box">
+            <input type="text" id="nick-field" class="nickname-input" placeholder="Твой никнейм...">
+            <button class="exit-btn">Выход</button>
+        </div>
+    </div>
+
+    <div class="chat-container" id="chat-box"></div>
+
+    <div class="input-area">
+        <div class="message-input-wrapper">
+            <input type="text" id="msg-field" class="main-input" placeholder="Сообщение в чат...">
+        </div>
+        <button class="send-btn" id="send-button" title="Отправить">
+            <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+    </div>
+
+    <script>
+        const webhookUrl = "https://discord.com/api/webhooks/1510243535201370224/cLwJiFOOg6ZjGqqChhMEZcy8Wx83pxt92EUweENLkToic2jSw5nJwaQubjiVVKpQ8nLD";
+        const discordServerId = "1510243364363305100"; 
+
+        const chatBox = document.getElementById('chat-box');
+        const msgField = document.getElementById('msg-field');
+        const nickField = document.getElementById('nick-field');
+        const memberCountLabel = document.getElementById('member-count');
+        const sendButton = document.getElementById('send-button');
+
+        // Функция генерации рандомного уникального никнейма при входе
+        function generateRandomNickname() {
+            const randomNumber = Math.floor(1000 + Math.random() * 9000); // Генерирует 4 цифры от 1000 до 9999
+            nickField.value = `User_${randomNumber}`;
+        }
+
+        // 1. Отправка сообщения
+        async function sendMessage() {
+            const text = msgField.value.trim();
+            const nickname = nickField.value.trim() || "User";
+
+            if (!text) return;
+            msgField.value = '';
+
+            // Отображаем локально
+            appendMessage(nickname, text);
+
+            // Шлём веб-хук в Дискорд
+            try {
+                await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: nickname,
+                        content: text
+                    })
+                });
+            } catch (error) {
+                console.error("Ошибка веб-хука:", error);
+            }
+        }
+
+        // Синхронизация между вкладками браузера
+        const chatChannel = new BroadcastChannel('chatter_chat_bridge');
+        
+        chatChannel.onmessage = (event) => {
+            const { name, text, time } = event.data;
+            renderBubble(name, text, time, false);
+        };
+
+        function appendMessage(author, text) {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            renderBubble(author, text, timeStr, true);
+            
+            // Передаем сообщение на все остальные вкладки
+            chatChannel.postMessage({ name: author, text: text, time: timeStr });
+        }
+
+        // Функция отрисовки бабла
+        function renderBubble(author, text, time, isFromThisWindow) {
+            const bubble = document.createElement('div');
+            const currentNick = nickField.value.trim() || "User";
+            
+            // Если сообщение отправлено из ЭТОЙ вкладки — оно всегда "твоё" (справа)
+            // Если прилетело из другой вкладки, проверяем по никнейму
+            const isMe = isFromThisWindow || (author === currentNick);
+
+            bubble.className = `message-bubble ${isMe ? 'my-message' : ''}`;
+            
+            bubble.innerHTML = `
+                <div class="author-name">${author}</div>
+                <div class="message-text">${text}</div>
+                <div class="message-time">${time}</div>
+            `;
+            
+            chatBox.appendChild(bubble);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // 2. Получение количества участников сервера из Discord
+        async function updateMemberCount() {
+            try {
+                const response = await fetch(`https://discord.com/api/guilds/${discordServerId}/widget.json`);
+                const data = await response.json();
+                if (data && data.presence_count !== undefined) {
+                    memberCountLabel.textContent = `Участников: ${data.presence_count}`;
+                }
+            } catch (e) {
+                memberCountLabel.textContent = "Участников: 1";
+            }
+        }
+
+        // Клик по кнопке "Самолетик"
+        sendButton.addEventListener('click', sendMessage);
+
+        // Отправка по Enter
+        msgField.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        // Старт системы
+        generateRandomNickname(); // Генерируем уникальный ник при старте
+        updateMemberCount();
+        setInterval(updateMemberCount, 15000); 
+    </script>
+</body>
+</html>
