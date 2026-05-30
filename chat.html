@@ -111,7 +111,6 @@
             background-color: #ffffff;
         }
 
-        /* Область чата */
         .chat-container {
             height: calc(100% - 130px);
             overflow-y: auto;
@@ -120,18 +119,20 @@
             flex-direction: column;
             gap: 12px;
             background-color: #e7ebf0;
-            transition: height 0.2s ease;
         }
 
-        /* Свайп-контейнер для каждого сообщения */
         .message-row {
             display: flex;
             position: relative;
             width: 100%;
             user-select: none;
-            touch-action: pan-y;
         }
 
+        .message-row.my-row {
+            justify-content: flex-end;
+        }
+
+        /* Бабл сообщения — теперь он перетягивается независимо */
         .message-bubble {
             max-width: 75%;
             background-color: #ffffff;
@@ -144,10 +145,7 @@
             flex-direction: column;
             transition: transform 0.1s ease-out;
             cursor: pointer;
-        }
-
-        .message-row.my-row {
-            justify-content: flex-end;
+            touch-action: pan-y; /* Позволяет скроллить чат по вертикали, перетаскивая бабл вбок */
         }
 
         .message-row.my-row .message-bubble {
@@ -162,7 +160,6 @@
             margin-bottom: 3px;
         }
 
-        /* Отрисовка цитаты ответа внутри бабла */
         .reply-in-bubble {
             background: rgba(0, 0, 0, 0.05);
             border-left: 3px solid #248bf2;
@@ -194,21 +191,29 @@
             gap: 4px;
         }
 
-        /* Индикатор свайпа (стрелочка ответа, как в TG) */
+        /* Индикатор ответа появляется прямо за баблом при сдвиге */
         .swipe-indicator {
             position: absolute;
-            right: -40px;
             top: 50%;
             transform: translateY(-50%);
             width: 30px;
             height: 30px;
-            background: rgba(0,0,0,0.1);
+            background: rgba(0,0,0,0.08);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             opacity: 0;
+            pointer-events: none;
             transition: opacity 0.1s;
+        }
+
+        /* Для моих сообщений стрелка справа, для чужих слева */
+        .my-row .swipe-indicator {
+            right: -40px;
+        }
+        .message-row:not(.my-row) .swipe-indicator {
+            right: -40px;
         }
 
         .swipe-indicator svg {
@@ -217,7 +222,6 @@
             fill: #248bf2;
         }
 
-        /* Панель над полем ввода для Режима Ответа/Редактирования */
         .action-bar {
             display: none;
             background: #ffffff;
@@ -260,7 +264,6 @@
             fill: #757575;
         }
 
-        /* Контекстное меню (Удалить / Редактировать) */
         .context-menu {
             position: fixed;
             background: #ffffff;
@@ -288,7 +291,6 @@
             color: #e53935;
         }
 
-        /* Нижняя панель ввода */
         .input-area {
             min-height: 70px;
             padding: 10px 15px;
@@ -344,7 +346,7 @@
             </div>
             <div class="meta-text">
                 <span class="title">General</span>
-                <span class="subtitle">В сети</span>
+                <span class="subtitle">Активен</span>
             </div>
         </div>
         <div class="nickname-box">
@@ -382,7 +384,6 @@
     <script>
         const webhookUrl = "https://discord.com/api/webhooks/1510243535201370224/cLwJiFOOg6ZjGqqChhMEZcy8Wx83pxt92EUweENLkToic2jSw5nJwaQubjiVVKpQ8nLD";
 
-        // ТВОЙ КОНФИГ FIREBASE
         const firebaseConfig = {
             apiKey: "AIzaSyAM27Htk_xLeh-ZR_CLh6EMK3Sd900aN_o",
             authDomain: "chat-chatter-dca8b.firebaseapp.com",
@@ -410,12 +411,10 @@
         const myFrameId = "id_" + Math.random().toString(36).substr(2, 9);
         let myCurrentNickname = "";
         
-        // Системные переменные для состояний
         let replyMessageId = null;
         let editMessageId = null;
         let selectedMsgData = null;
 
-        // Генерация и отслеживание Никнейма
         function initNickname() {
             const randomNumber = Math.floor(1000 + Math.random() * 9000);
             myCurrentNickname = `User_${randomNumber}`;
@@ -423,7 +422,10 @@
         }
         nickField.addEventListener('input', () => { myCurrentNickname = nickField.value.trim() || "User"; });
 
-        // Отрисовка строки сообщения в DOM
+        function renderBubble(author, text, time, isMe) {
+            // Оставляем пустую для совместимости со старыми вызовами
+        }
+
         function createMessageElement(id, data) {
             const isMe = data.frameId === myFrameId;
             const row = document.createElement('div');
@@ -452,38 +454,74 @@
                 </div>
             `;
 
-            setupSwipeAndTouch(row, isMe, data);
+            setupInteraction(row, isMe, data);
             return row;
         }
 
-        // Логика Свайпа (как в Телеграм) и Клик-обработчиков
-        function setupSwipeAndTouch(row, isMe, data) {
+        // Новая логика: Свайп ТОЛЬКО за бабл + Меню строго по Удержанию (Long Press)
+        function setupInteraction(row, isMe, data) {
             const bubble = row.querySelector('.message-bubble');
             const indicator = row.querySelector('.swipe-indicator');
+            
             let startX = 0;
             let currentX = 0;
             let isSwiping = false;
+            let pressTimer = null;
+            let isLongPress = false;
 
-            // Свайп мышкой/пальцем влево
-            row.addEventListener('touchstart', (e) => {
-                startX = e.touches[0].clientX;
+            // --- Функция открытия меню ---
+            function handleLongPress(e) {
+                isLongPress = true;
+                selectedMsgData = { id: row.dataset.id, author: data.author, text: data.text };
+                
+                let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+                ctxMenu.style.top = `${clientY}px`;
+                ctxMenu.style.left = `${Math.min(clientX, window.innerWidth - 170)}px`;
+                ctxMenu.style.display = 'flex';
+
+                if (isMe) {
+                    document.getElementById('menu-edit').style.display = 'block';
+                    document.getElementById('menu-delete').style.display = 'block';
+                } else {
+                    document.getElementById('menu-edit').style.display = 'none';
+                    document.getElementById('menu-delete').style.display = 'none';
+                }
+            }
+
+            // --- ТРИГГЕРЫ ДЛЯ ПК (Мышь) ---
+            bubble.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return; // Только левая кнопка
+                isLongPress = false;
+                startX = e.clientX;
                 isSwiping = true;
-            }, {passive: true});
 
-            row.addEventListener('touchmove', (e) => {
+                pressTimer = setTimeout(() => {
+                    handleLongPress(e);
+                    isSwiping = false; // Отменяем свайп, если пошло удержание
+                }, 600);
+            });
+
+            window.addEventListener('mousemove', (e) => {
                 if (!isSwiping) return;
-                currentX = e.touches[0].clientX;
+                currentX = e.clientX;
                 let diffX = startX - currentX;
+                
+                // Если мышь сдвинулась более чем на 10px, отменяем длинное нажатие
+                if (Math.abs(diffX) > 10) clearTimeout(pressTimer);
+
                 if (diffX > 0 && diffX < 80) {
                     bubble.style.transform = `translateX(-${diffX}px)`;
                     indicator.style.opacity = diffX / 60;
                 }
-            }, {passive: true});
+            });
 
-            row.addEventListener('touchend', () => {
+            window.addEventListener('mouseup', (e) => {
+                clearTimeout(pressTimer);
                 if (!isSwiping) return;
                 let diffX = startX - currentX;
-                if (diffX >= 50) {
+                if (diffX >= 50 && !isLongPress) {
                     triggerReplyMode(row.dataset.id, data.author, data.text);
                 }
                 bubble.style.transform = 'translateX(0px)';
@@ -491,19 +529,44 @@
                 isSwiping = false;
             });
 
-            // Для ПК: Двойной клик вызывает ответ на сообщение
-            row.addEventListener('dblclick', () => {
-                triggerReplyMode(row.dataset.id, data.author, data.text);
-            });
+            // --- ТРИГГЕРЫ ДЛЯ СМАРТФОНОВ (Тач) ---
+            bubble.addEventListener('touchstart', (e) => {
+                isLongPress = false;
+                startX = e.touches[0].clientX;
+                isSwiping = true;
 
-            // Обычный клик открывает контекстное меню настроек
-            bubble.addEventListener('click', (e) => {
-                e.stopPropagation();
-                openContextMenu(e, row.dataset.id, isMe, data);
+                pressTimer = setTimeout(() => {
+                    handleLongPress(e);
+                    isSwiping = false;
+                }, 600);
+            }, {passive: true});
+
+            bubble.addEventListener('touchmove', (e) => {
+                if (!isSwiping) return;
+                currentX = e.touches[0].clientX;
+                let diffX = startX - currentX;
+
+                if (Math.abs(diffX) > 10) clearTimeout(pressTimer);
+
+                if (diffX > 0 && diffX < 80) {
+                    bubble.style.transform = `translateX(-${diffX}px)`;
+                    indicator.style.opacity = diffX / 60;
+                }
+            }, {passive: true});
+
+            bubble.addEventListener('touchend', () => {
+                clearTimeout(pressTimer);
+                if (!isSwiping) return;
+                let diffX = startX - currentX;
+                if (diffX >= 50 && !isLongPress) {
+                    triggerReplyMode(row.dataset.id, data.author, data.text);
+                }
+                bubble.style.transform = 'translateX(0px)';
+                indicator.style.opacity = 0;
+                isSwiping = false;
             });
         }
 
-        // Включение режима ответа
         function triggerReplyMode(id, author, text) {
             cancelActions();
             replyMessageId = id;
@@ -513,7 +576,6 @@
             msgField.focus();
         }
 
-        // Включение режима редактирования
         function triggerEditMode(id, text) {
             cancelActions();
             editMessageId = id;
@@ -524,7 +586,6 @@
             msgField.focus();
         }
 
-        // Сброс режимов (крестик)
         function cancelActions() {
             replyMessageId = null;
             editMessageId = null;
@@ -533,24 +594,6 @@
         }
         actionCancel.addEventListener('click', cancelActions);
 
-        // Открытие меню настроек сообщения
-        function openContextMenu(e, id, isMe, data) {
-            selectedMsgData = { id: id, author: data.author, text: data.text };
-            ctxMenu.style.top = `${e.clientY}px`;
-            ctxMenu.style.left = `${Math.min(e.clientX, window.innerWidth - 170)}px`;
-            ctxMenu.style.display = 'flex';
-
-            // Скрываем изменение/удаление для чужих сообщений
-            if (isMe) {
-                document.getElementById('menu-edit').style.display = 'block';
-                document.getElementById('menu-delete').style.display = 'block';
-            } else {
-                document.getElementById('menu-edit').style.display = 'none';
-                document.getElementById('menu-delete').style.display = 'none';
-            }
-        }
-
-        // Нажатия в меню
         document.getElementById('menu-reply').addEventListener('click', () => {
             triggerReplyMode(selectedMsgData.id, selectedMsgData.author, selectedMsgData.text);
             ctxMenu.style.display = 'none';
@@ -562,30 +605,27 @@
         });
 
         document.getElementById('menu-delete').addEventListener('click', () => {
-            // Мгновенное удаление узла прямо из Firebase базы
             database.ref('messages/' + selectedMsgData.id).remove();
             ctxMenu.style.display = 'none';
             cancelActions();
         });
 
-        // Закрытие меню по клику в любое пустое место экрана
-        document.addEventListener('click', () => { ctxMenu.style.display = 'none'; });
+        document.addEventListener('mousedown', (e) => {
+            if (!ctxMenu.contains(e.target)) ctxMenu.style.display = 'none';
+        });
 
-        // Отправка ИЛИ Сохранение отредактированного сообщения
         async function sendOrUpdateMessage() {
             const text = msgField.value.trim();
             const nickname = nickField.value.trim() || "User";
             if (!text) return;
 
             if (editMessageId) {
-                // РЕЖИМ РЕДАКТИРОВАНИЯ: Обновляем только поля текста и статуса
                 database.ref('messages/' + editMessageId).update({
                     text: text,
                     edited: true
                 });
                 cancelActions();
             } else {
-                // РЕЖИМ ОТПРАВКИ (Обычный или с Ответом)
                 const now = new Date();
                 const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -597,17 +637,15 @@
                     edited: false
                 };
 
-                // Если это ответ на чужую реплику, докидываем мета-данные
                 if (replyMessageId) {
                     payload.replyToId = replyMessageId;
-                    payload.replyToAuthor = actionDesc.previousSibling ? selectedMsgData.author : actionTitle.textContent.replace('Ответ пользователю ', '');
+                    payload.replyToAuthor = actionTitle.textContent.replace('Ответ пользователю ', '');
                     payload.replyToText = actionDesc.textContent;
                 }
 
                 database.ref('messages').push(payload);
                 cancelActions();
 
-                // Отправляем лог в Дискорд
                 try {
                     await fetch(webhookUrl, {
                         method: 'POST',
@@ -621,25 +659,20 @@
         sendButton.addEventListener('click', sendOrUpdateMessage);
         msgField.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendOrUpdateMessage(); });
 
-        // СЛУШАТЕЛИ FIREBASE (Следим за изменениями в реальном времени)
-        
-        // 1. Прилетело новое сообщение
         database.ref('messages').limitToLast(50).on('child_added', (snapshot) => {
             const id = snapshot.key;
-            if (document.getElementById(`msg-${id}`)) return; // Защита дублей
+            if (document.getElementById(`msg-${id}`)) return;
             const data = snapshot.val();
             const el = createMessageElement(id, data);
             chatBox.appendChild(el);
             chatBox.scrollTop = chatBox.scrollHeight;
         });
 
-        // 2. Кто-то изменил сообщение (Привязка к редактированию)
         database.ref('messages').on('child_changed', (snapshot) => {
             const id = snapshot.key;
             const data = snapshot.val();
             const existingRow = document.getElementById(`msg-${id}`);
             if (existingRow) {
-                // Обновляем текст сообщения на экране и добавляем пометку (ред.)
                 existingRow.querySelector('.message-text').textContent = data.text;
                 const timeSpan = existingRow.querySelector('.message-meta-info span');
                 if (timeSpan && !timeSpan.textContent.includes('(ред.)')) {
@@ -648,13 +681,10 @@
             }
         });
 
-        // 3. Кто-то стёр сообщение (Привязка к удалению)
         database.ref('messages').on('child_removed', (snapshot) => {
             const id = snapshot.key;
             const existingRow = document.getElementById(`msg-${id}`);
-            if (existingRow) {
-                existingRow.remove(); // Мгновенно убираем из верстки экрана
-            }
+            if (existingRow) existingRow.remove();
         });
 
         initNickname();
