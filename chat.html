@@ -12,6 +12,7 @@
             margin: 0;
             padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body, html {
@@ -21,7 +22,6 @@
             overflow: hidden;
         }
 
-        /* Шапка чата */
         .header {
             display: flex;
             align-items: center;
@@ -81,7 +81,6 @@
         .title {
             font-size: 16px;
             font-weight: 600;
-            color: #000000;
         }
 
         .subtitle {
@@ -90,7 +89,6 @@
             font-weight: 500;
         }
 
-        /* Поле никнейма в шапке (сдвиг на 80px, как ты просил) */
         .nickname-box {
             display: flex;
             align-items: center;
@@ -113,7 +111,7 @@
             background-color: #ffffff;
         }
 
-        /* Область сообщений (стиль Telegram/Чаттер) */
+        /* Область чата */
         .chat-container {
             height: calc(100% - 130px);
             overflow-y: auto;
@@ -122,61 +120,182 @@
             flex-direction: column;
             gap: 12px;
             background-color: #e7ebf0;
+            transition: height 0.2s ease;
         }
 
-        /* Баблы сообщений */
+        /* Свайп-контейнер для каждого сообщения */
+        .message-row {
+            display: flex;
+            position: relative;
+            width: 100%;
+            user-select: none;
+            touch-action: pan-y;
+        }
+
         .message-bubble {
             max-width: 75%;
             background-color: #ffffff;
             padding: 8px 14px;
             border-radius: 12px 12px 12px 0px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.07);
-            align-self: flex-start;
             position: relative;
             word-wrap: break-word;
             display: flex;
             flex-direction: column;
+            transition: transform 0.1s ease-out;
+            cursor: pointer;
         }
 
-        /* Светло-зеленый бабл для твоих собственных сообщений */
-        .message-bubble.my-message {
+        .message-row.my-row {
+            justify-content: flex-end;
+        }
+
+        .message-row.my-row .message-bubble {
             background-color: #eeffde;
             border-radius: 12px 12px 0px 12px;
-            align-self: flex-end;
         }
 
         .author-name {
             font-weight: 600;
-            font-size: 14px;
+            font-size: 13px;
             color: #2b73b3;
             margin-bottom: 3px;
+        }
+
+        /* Отрисовка цитаты ответа внутри бабла */
+        .reply-in-bubble {
+            background: rgba(0, 0, 0, 0.05);
+            border-left: 3px solid #248bf2;
+            padding: 4px 8px;
+            font-size: 13px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            color: #555;
+            max-width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .message-text {
             font-size: 15px;
             line-height: 1.4;
             color: #000000;
-            padding-right: 45px;
+            padding-right: 55px;
         }
 
-        .message-time {
+        .message-meta-info {
             font-size: 11px;
             color: #a3a3a3;
             position: absolute;
             bottom: 4px;
             right: 8px;
-            user-select: none;
+            display: flex;
+            gap: 4px;
+        }
+
+        /* Индикатор свайпа (стрелочка ответа, как в TG) */
+        .swipe-indicator {
+            position: absolute;
+            right: -40px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 30px;
+            background: rgba(0,0,0,0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.1s;
+        }
+
+        .swipe-indicator svg {
+            width: 16px;
+            height: 16px;
+            fill: #248bf2;
+        }
+
+        /* Панель над полем ввода для Режима Ответа/Редактирования */
+        .action-bar {
+            display: none;
+            background: #ffffff;
+            border-top: 1px solid #e2e8f0;
+            padding: 8px 15px;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+
+        .action-info {
+            border-left: 3px solid #248bf2;
+            padding-left: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex-grow: 1;
+        }
+
+        .action-title {
+            font-weight: 600;
+            color: #248bf2;
+            font-size: 12px;
+        }
+
+        .action-text {
+            color: #555;
+            font-size: 13px;
+        }
+
+        .action-close {
+            cursor: pointer;
+            padding: 4px;
+            margin-left: 10px;
+        }
+
+        .action-close svg {
+            width: 16px;
+            height: 16px;
+            fill: #757575;
+        }
+
+        /* Контекстное меню (Удалить / Редактировать) */
+        .context-menu {
+            position: fixed;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            display: none;
+            flex-direction: column;
+            z-index: 100;
+            overflow: hidden;
+            width: 160px;
+        }
+
+        .context-item {
+            padding: 10px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .context-item:hover {
+            background: #f5f5f5;
+        }
+
+        .context-item.delete {
+            color: #e53935;
         }
 
         /* Нижняя панель ввода */
         .input-area {
-            height: 70px;
+            min-height: 70px;
             padding: 10px 15px;
             display: flex;
             align-items: center;
             gap: 10px;
             background-color: #ffffff;
-            border-top: 1px solid #e2e8f0;
         }
 
         .message-input-wrapper {
@@ -198,7 +317,6 @@
             background-color: #ffffff;
         }
 
-        /* Круглая кнопка отправки */
         .send-btn {
             background-color: #248bf2;
             color: #ffffff;
@@ -210,23 +328,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background 0.2s, transform 0.1s;
             flex-shrink: 0;
-        }
-
-        .send-btn:hover {
-            background-color: #1a73e8;
-        }
-
-        .send-btn:active {
-            transform: scale(0.95);
-        }
-
-        .send-btn svg {
-            width: 20px;
-            height: 20px;
-            fill: #ffffff;
-            margin-left: 2px;
         }
     </style>
 </head>
@@ -245,7 +347,6 @@
                 <span class="subtitle">В сети</span>
             </div>
         </div>
-
         <div class="nickname-box">
             <input type="text" id="nick-field" class="nickname-input" placeholder="Your nickname...">
         </div>
@@ -253,128 +354,310 @@
 
     <div class="chat-container" id="chat-box"></div>
 
+    <div class="action-bar" id="action-panel">
+        <div class="action-info">
+            <div class="action-title" id="action-title">Ответ на сообщение</div>
+            <div class="action-text" id="action-desc">Текст...</div>
+        </div>
+        <div class="action-close" id="action-cancel">
+            <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </div>
+    </div>
+
     <div class="input-area">
         <div class="message-input-wrapper">
             <input type="text" id="msg-field" class="main-input" placeholder="Сообщение в чат...">
         </div>
-        <button class="send-btn" id="send-button" title="Отправить">
-            <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        <button class="send-btn" id="send-button">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="#fff"/></svg>
         </button>
     </div>
 
+    <div class="context-menu" id="ctx-menu">
+        <div class="context-item" id="menu-reply">Ответить</div>
+        <div class="context-item" id="menu-edit">Редактировать</div>
+        <div class="context-item delete" id="menu-delete">Удалить</div>
+    </div>
+
     <script>
-        // Твой Discord Webhook для логирования
         const webhookUrl = "https://discord.com/api/webhooks/1510243535201370224/cLwJiFOOg6ZjGqqChhMEZcy8Wx83pxt92EUweENLkToic2jSw5nJwaQubjiVVKpQ8nLD";
+
+        // ТВОЙ КОНФИГ FIREBASE
+        const firebaseConfig = {
+            apiKey: "AIzaSyAM27Htk_xLeh-ZR_CLh6EMK3Sd900aN_o",
+            authDomain: "chat-chatter-dca8b.firebaseapp.com",
+            databaseURL: "https://chat-chatter-dca8b-default-rtdb.firebaseio.com",
+            projectId: "chat-chatter-dca8b",
+            storageBucket: "chat-chatter-dca8b.firebasestorage.app",
+            messagingSenderId: "307454337682",
+            appId: "1:307454337682:web:bc7ec779087e36de7c7c4b",
+            measurementId: "G-L89H2Z78RS"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
 
         const chatBox = document.getElementById('chat-box');
         const msgField = document.getElementById('msg-field');
         const nickField = document.getElementById('nick-field');
         const sendButton = document.getElementById('send-button');
+        const actionPanel = document.getElementById('action-panel');
+        const actionTitle = document.getElementById('action-title');
+        const actionDesc = document.getElementById('action-desc');
+        const actionCancel = document.getElementById('action-cancel');
+        const ctxMenu = document.getElementById('ctx-menu');
 
-        // Генерируем уникальный ID для текущей сессии/вкладки, чтобы отличать свои баблы от чужих
         const myFrameId = "id_" + Math.random().toString(36).substr(2, 9);
         let myCurrentNickname = "";
-        let database;
+        
+        // Системные переменные для состояний
+        let replyMessageId = null;
+        let editMessageId = null;
+        let selectedMsgData = null;
 
-        // Функция отрисовки сообщений (объявлена первой во избежание ошибок инициализации)
-        function renderBubble(author, text, time, isMe) {
-            const bubble = document.createElement('div');
-            bubble.className = `message-bubble ${isMe ? 'my-message' : ''}`;
-            
-            bubble.innerHTML = `
-                <div class="author-name">${author}</div>
-                <div class="message-text">${text}</div>
-                <div class="message-time">${time}</div>
-            `;
-            
-            chatBox.appendChild(bubble);
-            chatBox.scrollTop = chatBox.scrollHeight; // Автоматический скролл вниз
-        }
-
-        // Автогенерация случайного никнейма при старте
+        // Генерация и отслеживание Никнейма
         function initNickname() {
             const randomNumber = Math.floor(1000 + Math.random() * 9000);
             myCurrentNickname = `User_${randomNumber}`;
             nickField.value = myCurrentNickname;
         }
+        nickField.addEventListener('input', () => { myCurrentNickname = nickField.value.trim() || "User"; });
 
-        nickField.addEventListener('input', () => {
-            myCurrentNickname = nickField.value.trim() || "User";
-        });
+        // Отрисовка строки сообщения в DOM
+        function createMessageElement(id, data) {
+            const isMe = data.frameId === myFrameId;
+            const row = document.createElement('div');
+            row.className = `message-row ${isMe ? 'my-row' : ''}`;
+            row.id = `msg-${id}`;
+            row.dataset.id = id;
 
-        // Подключение к ТВОЕМУ проекту Firebase Realtime Database
-        function initFirebase() {
-            const firebaseConfig = {
-                apiKey: "AIzaSyAM27Htk_xLeh-ZR_CLh6EMK3Sd900aN_o",
-                authDomain: "chat-chatter-dca8b.firebaseapp.com",
-                databaseURL: "https://chat-chatter-dca8b-default-rtdb.firebaseio.com",
-                projectId: "chat-chatter-dca8b",
-                storageBucket: "chat-chatter-dca8b.firebasestorage.app",
-                messagingSenderId: "307454337682",
-                appId: "1:307454337682:web:bc7ec779087e36de7c7c4b",
-                measurementId: "G-L89H2Z78RS"
-            };
-            
-            firebase.initializeApp(firebaseConfig);
-            database = firebase.database();
+            let replyHTML = '';
+            if (data.replyToText) {
+                replyHTML = `<div class="reply-in-bubble"><b>${data.replyToAuthor}</b>: ${data.replyToText}</div>`;
+            }
 
-            // Живой слушатель базы данных. Срабатывает мгновенно, когда кто-то отправляет сообщение
-            database.ref('messages').limitToLast(50).on('child_added', (snapshot) => {
-                const data = snapshot.val();
-                if (data && data.author && data.text && data.time) {
-                    const isMe = data.frameId === myFrameId;
-                    renderBubble(data.author, data.text, data.time, isMe);
+            const editedLabel = data.edited ? ' (ред.)' : '';
+
+            row.innerHTML = `
+                <div class="message-bubble">
+                    ${replyHTML}
+                    <div class="author-name">${data.author}</div>
+                    <div class="message-text">${data.text}</div>
+                    <div class="message-meta-info">
+                        <span>${data.time}${editedLabel}</span>
+                    </div>
+                </div>
+                <div class="swipe-indicator">
+                    <svg viewBox="0 0 24 24"><path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg>
+                </div>
+            `;
+
+            setupSwipeAndTouch(row, isMe, data);
+            return row;
+        }
+
+        // Логика Свайпа (как в Телеграм) и Клик-обработчиков
+        function setupSwipeAndTouch(row, isMe, data) {
+            const bubble = row.querySelector('.message-bubble');
+            const indicator = row.querySelector('.swipe-indicator');
+            let startX = 0;
+            let currentX = 0;
+            let isSwiping = false;
+
+            // Свайп мышкой/пальцем влево
+            row.addEventListener('touchstart', (e) => {
+                startX = e.touches[0].clientX;
+                isSwiping = true;
+            }, {passive: true});
+
+            row.addEventListener('touchmove', (e) => {
+                if (!isSwiping) return;
+                currentX = e.touches[0].clientX;
+                let diffX = startX - currentX;
+                if (diffX > 0 && diffX < 80) {
+                    bubble.style.transform = `translateX(-${diffX}px)`;
+                    indicator.style.opacity = diffX / 60;
                 }
+            }, {passive: true});
+
+            row.addEventListener('touchend', () => {
+                if (!isSwiping) return;
+                let diffX = startX - currentX;
+                if (diffX >= 50) {
+                    triggerReplyMode(row.dataset.id, data.author, data.text);
+                }
+                bubble.style.transform = 'translateX(0px)';
+                indicator.style.opacity = 0;
+                isSwiping = false;
+            });
+
+            // Для ПК: Двойной клик вызывает ответ на сообщение
+            row.addEventListener('dblclick', () => {
+                triggerReplyMode(row.dataset.id, data.author, data.text);
+            });
+
+            // Обычный клик открывает контекстное меню настроек
+            bubble.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openContextMenu(e, row.dataset.id, isMe, data);
             });
         }
 
-        // Функция отправки сообщений
-        async function sendMessage() {
-            const text = msgField.value.trim();
-            const nickname = nickField.value.trim() || "User";
+        // Включение режима ответа
+        function triggerReplyMode(id, author, text) {
+            cancelActions();
+            replyMessageId = id;
+            actionTitle.textContent = `Ответ пользователю ${author}`;
+            actionDesc.textContent = text;
+            actionPanel.style.display = 'flex';
+            msgField.focus();
+        }
 
-            if (!text) return;
-            msgField.value = ''; // Очищаем поле ввода
+        // Включение режима редактирования
+        function triggerEditMode(id, text) {
+            cancelActions();
+            editMessageId = id;
+            actionTitle.textContent = `Редактирование сообщения`;
+            actionDesc.textContent = text;
+            actionPanel.style.display = 'flex';
+            msgField.value = text;
+            msgField.focus();
+        }
 
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        // Сброс режимов (крестик)
+        function cancelActions() {
+            replyMessageId = null;
+            editMessageId = null;
+            actionPanel.style.display = 'none';
+            msgField.value = '';
+        }
+        actionCancel.addEventListener('click', cancelActions);
 
-            const payload = {
-                frameId: myFrameId,
-                author: nickname,
-                text: text,
-                time: timeStr
-            };
+        // Открытие меню настроек сообщения
+        function openContextMenu(e, id, isMe, data) {
+            selectedMsgData = { id: id, author: data.author, text: data.text };
+            ctxMenu.style.top = `${e.clientY}px`;
+            ctxMenu.style.left = `${Math.min(e.clientX, window.innerWidth - 170)}px`;
+            ctxMenu.style.display = 'flex';
 
-            // 1. Записываем в Firebase (сообщение тут же отобразится на всех устройствах)
-            if (database) {
-                database.ref('messages').push(payload);
-            }
-
-            // 2. Дублируем логи админу в Дискорд
-            try {
-                await fetch(webhookUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        username: nickname,
-                        content: text
-                    })
-                });
-            } catch (error) {
-                console.error("Ошибка Discord Webhook:", error);
+            // Скрываем изменение/удаление для чужих сообщений
+            if (isMe) {
+                document.getElementById('menu-edit').style.display = 'block';
+                document.getElementById('menu-delete').style.display = 'block';
+            } else {
+                document.getElementById('menu-edit').style.display = 'none';
+                document.getElementById('menu-delete').style.display = 'none';
             }
         }
 
-        // Слушатели кнопок и клавиш
-        sendButton.addEventListener('click', sendMessage);
-        msgField.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') sendMessage();
+        // Нажатия в меню
+        document.getElementById('menu-reply').addEventListener('click', () => {
+            triggerReplyMode(selectedMsgData.id, selectedMsgData.author, selectedMsgData.text);
+            ctxMenu.style.display = 'none';
         });
 
-        // Инициализация
+        document.getElementById('menu-edit').addEventListener('click', () => {
+            triggerEditMode(selectedMsgData.id, selectedMsgData.text);
+            ctxMenu.style.display = 'none';
+        });
+
+        document.getElementById('menu-delete').addEventListener('click', () => {
+            // Мгновенное удаление узла прямо из Firebase базы
+            database.ref('messages/' + selectedMsgData.id).remove();
+            ctxMenu.style.display = 'none';
+            cancelActions();
+        });
+
+        // Закрытие меню по клику в любое пустое место экрана
+        document.addEventListener('click', () => { ctxMenu.style.display = 'none'; });
+
+        // Отправка ИЛИ Сохранение отредактированного сообщения
+        async function sendOrUpdateMessage() {
+            const text = msgField.value.trim();
+            const nickname = nickField.value.trim() || "User";
+            if (!text) return;
+
+            if (editMessageId) {
+                // РЕЖИМ РЕДАКТИРОВАНИЯ: Обновляем только поля текста и статуса
+                database.ref('messages/' + editMessageId).update({
+                    text: text,
+                    edited: true
+                });
+                cancelActions();
+            } else {
+                // РЕЖИМ ОТПРАВКИ (Обычный или с Ответом)
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                const payload = {
+                    frameId: myFrameId,
+                    author: nickname,
+                    text: text,
+                    time: timeStr,
+                    edited: false
+                };
+
+                // Если это ответ на чужую реплику, докидываем мета-данные
+                if (replyMessageId) {
+                    payload.replyToId = replyMessageId;
+                    payload.replyToAuthor = actionDesc.previousSibling ? selectedMsgData.author : actionTitle.textContent.replace('Ответ пользователю ', '');
+                    payload.replyToText = actionDesc.textContent;
+                }
+
+                database.ref('messages').push(payload);
+                cancelActions();
+
+                // Отправляем лог в Дискорд
+                try {
+                    await fetch(webhookUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: nickname, content: replyMessageId ? `[Ответ]: ${text}` : text })
+                    });
+                } catch (e) {}
+            }
+        }
+
+        sendButton.addEventListener('click', sendOrUpdateMessage);
+        msgField.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendOrUpdateMessage(); });
+
+        // СЛУШАТЕЛИ FIREBASE (Следим за изменениями в реальном времени)
+        
+        // 1. Прилетело новое сообщение
+        database.ref('messages').limitToLast(50).on('child_added', (snapshot) => {
+            const id = snapshot.key;
+            if (document.getElementById(`msg-${id}`)) return; // Защита дублей
+            const data = snapshot.val();
+            const el = createMessageElement(id, data);
+            chatBox.appendChild(el);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        });
+
+        // 2. Кто-то изменил сообщение (Привязка к редактированию)
+        database.ref('messages').on('child_changed', (snapshot) => {
+            const id = snapshot.key;
+            const data = snapshot.val();
+            const existingRow = document.getElementById(`msg-${id}`);
+            if (existingRow) {
+                // Обновляем текст сообщения на экране и добавляем пометку (ред.)
+                existingRow.querySelector('.message-text').textContent = data.text;
+                const timeSpan = existingRow.querySelector('.message-meta-info span');
+                if (timeSpan && !timeSpan.textContent.includes('(ред.)')) {
+                    timeSpan.textContent = `${data.time} (ред.)`;
+                }
+            }
+        });
+
+        // 3. Кто-то стёр сообщение (Привязка к удалению)
+        database.ref('messages').on('child_removed', (snapshot) => {
+            const id = snapshot.key;
+            const existingRow = document.getElementById(`msg-${id}`);
+            if (existingRow) {
+                existingRow.remove(); // Мгновенно убираем из верстки экрана
+            }
+        });
+
         initNickname();
-        initFirebase();
     </script>
 </body>
 </html>
