@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chatter Chat Bridge</title>
+    <title>Chatter Secure Bridge</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
@@ -22,6 +22,7 @@
             overflow: hidden;
         }
 
+        /* Шапка чата */
         .header {
             display: flex;
             align-items: center;
@@ -106,13 +107,44 @@
             font-weight: 500;
         }
 
-        .nickname-input:focus {
-            border-color: #248bf2;
-            background-color: #ffffff;
+        /* ПОДШАПКА С КНОПКОЙ БРОНИРОВАНИЯ */
+        .sub-bar {
+            height: 45px;
+            background-color: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            position: relative;
+            z-index: 9;
         }
 
+        .booking-status-text {
+            font-size: 13px;
+            font-weight: 500;
+            color: #64748b;
+        }
+
+        .booking-btn {
+            background-color: #248bf2;
+            color: #ffffff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 15px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            box-shadow: 0 2px 4px rgba(36, 139, 242, 0.2);
+        }
+
+        .booking-btn:hover { background-color: #1a73e8; }
+        .booking-btn.active-lock { background-color: #e53935; box-shadow: 0 2px 4px rgba(229, 57, 53, 0.2); }
+
+        /* Область сообщений */
         .chat-container {
-            height: calc(100% - 130px);
+            height: calc(100% - 175px);
             overflow-y: auto;
             padding: 20px 15px;
             display: flex;
@@ -121,217 +153,173 @@
             background-color: #e7ebf0;
         }
 
-        .message-row {
-            display: flex;
-            position: relative;
-            width: 100%;
-            user-select: none;
-        }
+        .message-row { display: flex; position: relative; width: 100%; user-select: none; }
+        .message-row.my-row { justify-content: flex-end; }
 
-        .message-row.my-row {
-            justify-content: flex-end;
-        }
-
-        /* Бабл сообщения — теперь он перетягивается независимо */
         .message-bubble {
-            max-width: 75%;
-            background-color: #ffffff;
-            padding: 8px 14px;
-            border-radius: 12px 12px 12px 0px;
+            max-width: 75%; 
+            background-color: #ffffff; 
+            padding: 8px 14px 24px 14px; 
+            border-radius: 12px 12px 12px 0px; 
             box-shadow: 0 1px 2px rgba(0,0,0,0.07);
-            position: relative;
-            word-wrap: break-word;
-            display: flex;
+            position: relative; 
+            word-wrap: break-word; 
+            display: inline-flex; 
             flex-direction: column;
-            transition: transform 0.1s ease-out;
-            cursor: pointer;
-            touch-action: pan-y; /* Позволяет скроллить чат по вертикали, перетаскивая бабл вбок */
+            transition: transform 0.1s ease-out; 
+            cursor: pointer; 
+            touch-action: pan-y;
         }
 
-        .message-row.my-row .message-bubble {
-            background-color: #eeffde;
-            border-radius: 12px 12px 0px 12px;
+        .message-row.my-row .message-bubble { background-color: #eeffde; border-radius: 12px 12px 0px 12px; }
+        .author-name { font-weight: 600; font-size: 13px; color: #2b73b3; margin-bottom: 3px; }
+        .reply-in-bubble { background: rgba(0, 0, 0, 0.05); border-left: 3px solid #248bf2; padding: 4px 8px; font-size: 13px; border-radius: 4px; margin-bottom: 5px; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .message-text { 
+            font-size: 15px; 
+            line-height: 1.4; 
+            color: #000000; 
+            margin-bottom: 4px;
         }
-
-        .author-name {
-            font-weight: 600;
-            font-size: 13px;
-            color: #2b73b3;
-            margin-bottom: 3px;
-        }
-
-        .reply-in-bubble {
-            background: rgba(0, 0, 0, 0.05);
-            border-left: 3px solid #248bf2;
-            padding: 4px 8px;
-            font-size: 13px;
-            border-radius: 4px;
-            margin-bottom: 5px;
-            color: #555;
-            max-width: 100%;
+        
+        .message-meta-info { 
+            font-size: 11px; 
+            color: #a3a3a3; 
+            position: absolute; 
+            bottom: 4px; 
+            right: 10px; 
+            display: flex; 
+            align-items: center;
+            gap: 4px; 
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
-        .message-text {
-            font-size: 15px;
-            line-height: 1.4;
-            color: #000000;
-            padding-right: 55px;
+        .swipe-indicator { position: absolute; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; background: rgba(0,0,0,0.08); border-radius: 50%; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.1s; right: -40px; }
+        .swipe-indicator svg { width: 16px; height: 16px; fill: #248bf2; }
+
+        /* Окна модалок */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 100; display: none;
+            align-items: center; justify-content: center;
         }
 
-        .message-meta-info {
-            font-size: 11px;
-            color: #a3a3a3;
-            position: absolute;
-            bottom: 4px;
-            right: 8px;
-            display: flex;
-            gap: 4px;
+        .modal-card {
+            background: white; padding: 20px; border-radius: 12px;
+            width: 320px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            display: flex; flex-direction: column; gap: 12px; color: #000;
         }
 
-        /* Индикатор ответа появляется прямо за баблом при сдвиге */
-        .swipe-indicator {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 30px;
-            height: 30px;
-            background: rgba(0,0,0,0.08);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.1s;
-        }
+        .modal-card h3 { font-size: 18px; font-weight: 600; margin-bottom: 5px; }
+        .modal-card input { width: 100%; padding: 10px; border: 1px solid #e0e0e0; border-radius: 8px; outline: none; font-size: 14px; }
+        .modal-card button { background: #248bf2; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; }
 
-        /* Для моих сообщений стрелка справа, для чужих слева */
-        .my-row .swipe-indicator {
-            right: -40px;
-        }
-        .message-row:not(.my-row) .swipe-indicator {
-            right: -40px;
-        }
-
-        .swipe-indicator svg {
-            width: 16px;
-            height: 16px;
-            fill: #248bf2;
-        }
-
-        .action-bar {
+        /* ЭКРАН БЛОКИРОВКИ */
+        .server-lock-screen {
+            position: fixed; 
+            top: 105px; 
+            left: 0; 
+            width: 100%; 
+            height: calc(100% - 105px);
+            background: rgba(47, 51, 55, 0.65); 
+            backdrop-filter: blur(6px); 
+            -webkit-backdrop-filter: blur(6px);
+            z-index: 80; 
             display: none;
-            background: #ffffff;
-            border-top: 1px solid #e2e8f0;
-            padding: 8px 15px;
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            padding: 20px; 
+            text-align: center;
+        }
+
+        .lock-card {
+            background: #ffffff; 
+            padding: 30px 24px; 
+            border-radius: 16px; 
+            max-width: 380px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); 
+            display: flex; 
+            flex-direction: column; 
             align-items: center;
-            justify-content: space-between;
-            font-size: 14px;
+            gap: 15px;
         }
 
-        .action-info {
-            border-left: 3px solid #248bf2;
-            padding-left: 8px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            flex-grow: 1;
+        .lock-clock-svg {
+            width: 50px;
+            height: 50px;
+            fill: none;
+            stroke: #248bf2;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
-        .action-title {
-            font-weight: 600;
-            color: #248bf2;
-            font-size: 12px;
+        .lock-title {
+            font-size: 19px;
+            font-weight: 700;
+            color: #1e293b;
         }
 
-        .action-text {
-            color: #555;
-            font-size: 13px;
+        .lock-desc { 
+            font-size: 13.5px; 
+            color: #475569; 
+            line-height: 1.5; 
+            background: #f1f5f9; 
+            padding: 12px; 
+            border-radius: 8px; 
+            border-left: 4px solid #248bf2; 
+            text-align: left; 
         }
 
-        .action-close {
-            cursor: pointer;
-            padding: 4px;
-            margin-left: 10px;
+        .lock-timer-badge {
+            font-size: 15px; 
+            color: #ef5350; 
+            font-weight: 700;
+            background: #fdf2f2;
+            padding: 4px 12px;
+            border-radius: 12px;
         }
 
-        .action-close svg {
-            width: 16px;
-            height: 16px;
-            fill: #757575;
-        }
-
-        .context-menu {
-            position: fixed;
-            background: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-            display: none;
-            flex-direction: column;
-            z-index: 100;
-            overflow: hidden;
-            width: 160px;
-        }
-
-        .context-item {
-            padding: 10px 15px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: background 0.1s;
-        }
-
-        .context-item:hover {
-            background: #f5f5f5;
-        }
-
-        .context-item.delete {
-            color: #e53935;
-        }
-
-        .input-area {
-            min-height: 70px;
-            padding: 10px 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background-color: #ffffff;
-        }
-
-        .message-input-wrapper {
-            flex-grow: 1;
-        }
-
-        .main-input {
+        .lock-card input {
             width: 100%;
-            padding: 12px 20px;
-            border: 1px solid #e0e0e0;
-            border-radius: 25px;
-            font-size: 15px;
+            padding: 11px 15px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
             outline: none;
-            background-color: #f1f3f4;
+            font-size: 14px;
+            text-align: center;
         }
 
-        .main-input:focus {
-            border-color: #cbd5e1;
-            background-color: #ffffff;
-        }
-
-        .send-btn {
-            background-color: #248bf2;
-            color: #ffffff;
+        .lock-card button {
+            width: 100%;
+            background: #248bf2;
+            color: white;
             border: none;
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
+            padding: 11px;
+            border-radius: 8px;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
+            font-weight: 600;
+            font-size: 14px;
         }
+
+        /* Меню ввода */
+        .action-bar { display: none; background: #ffffff; border-top: 1px solid #e2e8f0; padding: 8px 15px; align-items: center; justify-content: space-between; font-size: 14px; }
+        .action-info { border-left: 3px solid #248bf2; padding-left: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-grow: 1; }
+        .action-title { font-weight: 600; color: #248bf2; font-size: 12px; }
+        .action-text { color: #555; font-size: 13px; }
+        .action-close { cursor: pointer; padding: 4px; margin-left: 10px; }
+        .action-close svg { width: 16px; height: 16px; fill: #757575; }
+
+        .context-menu { position: fixed; background: #ffffff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); display: none; flex-direction: column; z-index: 100; overflow: hidden; width: 160px; }
+        .context-item { padding: 10px 15px; font-size: 14px; cursor: pointer; transition: background 0.1s; }
+        .context-item:hover { background: #f5f5f5; }
+        .context-item.delete { color: #e53935; }
+
+        .input-area { min-height: 70px; padding: 10px 15px; display: flex; align-items: center; gap: 10px; background-color: #ffffff; }
+        .message-input-wrapper { flex-grow: 1; }
+        .main-input { width: 100%; padding: 12px 20px; border: 1px solid #e0e0e0; border-radius: 25px; font-size: 15px; outline: none; background-color: #f1f3f4; }
+        .send-btn { background-color: #248bf2; color: #ffffff; border: none; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     </style>
 </head>
 <body>
@@ -354,6 +342,11 @@
         </div>
     </div>
 
+    <div class="sub-bar">
+        <span class="booking-status-text" id="booking-timer-display">Сервер свободен для всех</span>
+        <button class="booking-btn" id="booking-action-btn">Бронировать</button>
+    </div>
+
     <div class="chat-container" id="chat-box"></div>
 
     <div class="action-bar" id="action-panel">
@@ -373,6 +366,30 @@
         <button class="send-btn" id="send-button">
             <svg viewBox="0 0 24 24" width="20" height="20"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="#fff"/></svg>
         </button>
+    </div>
+
+    <div class="modal-overlay" id="booking-modal">
+        <div class="modal-card">
+            <h3>Бронирование сервера</h3>
+            <input type="number" id="book-time" placeholder="Время брони (в минутах)..." min="1" value="15">
+            <input type="text" id="book-pass" placeholder="Задать пароль доступа...">
+            <input type="text" id="book-note" placeholder="Текст-инструкция для остальных...">
+            <button id="book-confirm-btn">Запустить конференцию</button>
+        </div>
+    </div>
+
+    <div class="server-lock-screen" id="lock-screen">
+        <div class="lock-card">
+            <svg class="lock-clock-svg" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <div class="lock-title">Сервер забронирован</div>
+            <div class="lock-timer-badge" id="lock-timer-countdown">00:00</div>
+            <div class="lock-desc" id="lock-instruction-text">Введите пароль от организатора. Если у вас его нет, спросите у него. Если же вы не были участником конференции, дождитесь пока бронь уйдёт.</div>
+            <input type="text" id="lock-password-input" placeholder="Введите пароль конференции...">
+            <button id="lock-unlock-btn">Войти в конференцию</button>
+        </div>
     </div>
 
     <div class="context-menu" id="ctx-menu">
@@ -407,9 +424,25 @@
         const actionDesc = document.getElementById('action-desc');
         const actionCancel = document.getElementById('action-cancel');
         const ctxMenu = document.getElementById('ctx-menu');
+        
+        const bookingActionBtn = document.getElementById('booking-action-btn');
+        const bookingModal = document.getElementById('booking-modal');
+        const bookTime = document.getElementById('book-time');
+        const bookPass = document.getElementById('book-pass');
+        const bookNote = document.getElementById('book-note');
+        const bookConfirmBtn = document.getElementById('book-confirm-btn');
+        const lockScreen = document.getElementById('lock-screen');
+        const lockInstructionText = document.getElementById('lock-instruction-text');
+        const lockTimerCountdown = document.getElementById('lock-timer-countdown');
+        const lockPasswordInput = document.getElementById('lock-password-input');
+        const lockUnlockBtn = document.getElementById('lock-unlock-btn');
+        const bookingTimerDisplay = document.getElementById('booking-timer-display');
 
-        const myFrameId = "id_" + Math.random().toString(36).substr(2, 9);
+        // ИСПРАВЛЕНО: Генерируем новый myFrameId и Никнейм КАЖДЫЙ РАЗ при запуске (никакого localStorage)
+        let myFrameId = "id_" + Math.random().toString(36).substr(2, 9);
         let myCurrentNickname = "";
+        let localUnlockPassed = false; 
+        let alertFiveMinTriggered = false; 
         
         let replyMessageId = null;
         let editMessageId = null;
@@ -420,12 +453,146 @@
             myCurrentNickname = `User_${randomNumber}`;
             nickField.value = myCurrentNickname;
         }
-        nickField.addEventListener('input', () => { myCurrentNickname = nickField.value.trim() || "User"; });
+        
+        nickField.addEventListener('input', () => { 
+            myCurrentNickname = nickField.value.trim() || "User"; 
+        });
 
-        function renderBubble(author, text, time, isMe) {
-            // Оставляем пустую для совместимости со старыми вызовами
+        let dbActivePassword = ""; 
+
+        // Механика «Снять бронь»: доступна всем при знании пароля
+        bookingActionBtn.addEventListener('click', () => {
+            if (bookingActionBtn.classList.contains('active-lock')) {
+                const inputPass = prompt("Введите пароль конференции для снятия брони:");
+                if (inputPass === null) return;
+                
+                if (inputPass === dbActivePassword) {
+                    database.ref('server_booking').remove();
+                    alert("Бронирование успешно снято. Сервер открыт!");
+                } else {
+                    alert("Неверный пароль! Вы не можете снять бронь.");
+                }
+            } else {
+                bookingModal.style.display = 'flex';
+            }
+        });
+
+        bookingModal.addEventListener('click', (e) => {
+            if (e.target === bookingModal) bookingModal.style.display = 'none';
+        });
+
+        bookConfirmBtn.addEventListener('click', () => {
+            const minutes = parseInt(bookTime.value) || 15;
+            const password = bookPass.value.trim();
+            const note = bookNote.value.trim();
+
+            if (!password) {
+                alert("Укажите пароль доступа обязательно!");
+                return;
+            }
+
+            const endTimeStamp = Date.now() + (minutes * 60 * 1000);
+
+            database.ref('server_booking').set({
+                hostFrameId: myFrameId,
+                hostName: myCurrentNickname,
+                password: password,
+                note: note || "Введите пароль от организатора. Если у вас его нет, спросите у него. Если же вы не были участником конференции, дождитесь пока бронь уйдёт.",
+                endsAt: endTimeStamp
+            });
+
+            bookingModal.style.display = 'none';
+            bookPass.value = '';
+            bookNote.value = '';
+        });
+
+        lockUnlockBtn.addEventListener('click', () => {
+            if (lockPasswordInput.value.trim() === dbActivePassword) {
+                localUnlockPassed = true;
+                lockScreen.style.display = 'none';
+                alert("Доступ разрешен! Приятного общения.");
+                database.ref('server_booking').get().then((snapshot) => {
+                    if (snapshot.exists()) updateBookingUI(snapshot.val());
+                });
+            } else {
+                alert("Неверный пароль конференции! Доступ заблокирован.");
+                lockPasswordInput.value = '';
+            }
+        });
+
+        database.ref('server_booking').on('value', (snapshot) => {
+            updateBookingUI(snapshot.val());
+        });
+
+        function updateBookingUI(data) {
+            if (!data) {
+                if (window.bookingInterval) clearInterval(window.bookingInterval);
+                bookingActionBtn.textContent = "Бронировать";
+                bookingActionBtn.classList.remove('active-lock');
+                bookingTimerDisplay.textContent = "Сервер свободен для всех";
+                bookingTimerDisplay.style.color = "#64748b";
+                lockScreen.style.display = 'none';
+                localUnlockPassed = false;
+                alertFiveMinTriggered = false;
+                dbActivePassword = "";
+                return;
+            }
+
+            const now = Date.now();
+            if (now >= data.endsAt) {
+                database.ref('server_booking').remove();
+                return;
+            }
+
+            dbActivePassword = data.password;
+            const isIHost = data.hostFrameId === myFrameId;
+            lockInstructionText.textContent = data.note;
+
+            if (window.bookingInterval) clearInterval(window.bookingInterval);
+
+            window.bookingInterval = setInterval(() => {
+                const timeLeft = data.endsAt - Date.now();
+
+                if (timeLeft <= 0) {
+                    clearInterval(window.bookingInterval);
+                    database.ref('server_booking').remove();
+                    return;
+                }
+
+                const totalSeconds = Math.floor(timeLeft / 1000);
+                const min = Math.floor(totalSeconds / 60);
+                const sec = totalSeconds % 60;
+                const timeString = `${min}:${sec < 10 ? '0' : ''}${sec}`;
+
+                bookingTimerDisplay.textContent = `Бронь: Конференция закончится через ${timeString}`;
+                bookingTimerDisplay.style.color = "#ef5350";
+                lockTimerCountdown.textContent = timeString;
+
+                bookingActionBtn.textContent = `Снять бронь (${timeString})`;
+                bookingActionBtn.classList.add('active-lock');
+
+                if (totalSeconds <= 300 && !alertFiveMinTriggered) {
+                    if (isIHost || localUnlockPassed) {
+                        alertFiveMinTriggered = true;
+                        if (window.AudioContext || window.webkitAudioContext) {
+                            let ctx = new (window.AudioContext || window.webkitAudioContext)();
+                            let osc = ctx.createOscillator();
+                            osc.connect(ctx.destination);
+                            osc.start(); osc.stop(0.3);
+                        }
+                        alert("⚠️ Внимание! Бронирование сервера Chatter завершается через 5 минут!");
+                    }
+                }
+            }, 1000);
+
+            if (isIHost || localUnlockPassed) {
+                lockScreen.style.display = 'none';
+            } else {
+                lockScreen.style.display = 'flex';
+            }
         }
 
+        // Работа с сообщениями
         function createMessageElement(id, data) {
             const isMe = data.frameId === myFrameId;
             const row = document.createElement('div');
@@ -458,7 +625,6 @@
             return row;
         }
 
-        // Новая логика: Свайп ТОЛЬКО за бабл + Меню строго по Удержанию (Long Press)
         function setupInteraction(row, isMe, data) {
             const bubble = row.querySelector('.message-bubble');
             const indicator = row.querySelector('.swipe-indicator');
@@ -469,7 +635,6 @@
             let pressTimer = null;
             let isLongPress = false;
 
-            // --- Функция открытия меню ---
             function handleLongPress(e) {
                 isLongPress = true;
                 selectedMsgData = { id: row.dataset.id, author: data.author, text: data.text };
@@ -490,16 +655,15 @@
                 }
             }
 
-            // --- ТРИГГЕРЫ ДЛЯ ПК (Мышь) ---
             bubble.addEventListener('mousedown', (e) => {
-                if (e.button !== 0) return; // Только левая кнопка
+                if (e.button !== 0) return;
                 isLongPress = false;
                 startX = e.clientX;
                 isSwiping = true;
 
                 pressTimer = setTimeout(() => {
                     handleLongPress(e);
-                    isSwiping = false; // Отменяем свайп, если пошло удержание
+                    isSwiping = false;
                 }, 600);
             });
 
@@ -507,8 +671,6 @@
                 if (!isSwiping) return;
                 currentX = e.clientX;
                 let diffX = startX - currentX;
-                
-                // Если мышь сдвинулась более чем на 10px, отменяем длинное нажатие
                 if (Math.abs(diffX) > 10) clearTimeout(pressTimer);
 
                 if (diffX > 0 && diffX < 80) {
@@ -517,7 +679,7 @@
                 }
             });
 
-            window.addEventListener('mouseup', (e) => {
+            window.addEventListener('mouseup', () => {
                 clearTimeout(pressTimer);
                 if (!isSwiping) return;
                 let diffX = startX - currentX;
@@ -529,12 +691,10 @@
                 isSwiping = false;
             });
 
-            // --- ТРИГГЕРЫ ДЛЯ СМАРТФОНОВ (Тач) ---
             bubble.addEventListener('touchstart', (e) => {
                 isLongPress = false;
                 startX = e.touches[0].clientX;
                 isSwiping = true;
-
                 pressTimer = setTimeout(() => {
                     handleLongPress(e);
                     isSwiping = false;
@@ -545,9 +705,7 @@
                 if (!isSwiping) return;
                 currentX = e.touches[0].clientX;
                 let diffX = startX - currentX;
-
                 if (Math.abs(diffX) > 10) clearTimeout(pressTimer);
-
                 if (diffX > 0 && diffX < 80) {
                     bubble.style.transform = `translateX(-${diffX}px)`;
                     indicator.style.opacity = diffX / 60;
@@ -620,10 +778,7 @@
             if (!text) return;
 
             if (editMessageId) {
-                database.ref('messages/' + editMessageId).update({
-                    text: text,
-                    edited: true
-                });
+                database.ref('messages/' + editMessageId).update({ text: text, edited: true });
                 cancelActions();
             } else {
                 const now = new Date();
