@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chatter Chat Bridge</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -84,10 +86,11 @@
 
         .subtitle {
             font-size: 13px;
-            color: #757575;
+            color: #4caf50;
+            font-weight: 500;
         }
 
-        /* Настройка никнейма в шапке (сдвиг уменьшен на 20px) */
+        /* Поле никнейма в шапке (сдвиг на 80px, как ты просил) */
         .nickname-box {
             display: flex;
             align-items: center;
@@ -110,7 +113,7 @@
             background-color: #ffffff;
         }
 
-        /* Область сообщений в стиле Telegram */
+        /* Область сообщений (стиль Telegram/Чаттер) */
         .chat-container {
             height: calc(100% - 130px);
             overflow-y: auto;
@@ -121,7 +124,7 @@
             background-color: #e7ebf0;
         }
 
-        /* Стиль бабла сообщения */
+        /* Баблы сообщений */
         .message-bubble {
             max-width: 75%;
             background-color: #ffffff;
@@ -135,7 +138,7 @@
             flex-direction: column;
         }
 
-        /* Зеленый бабл для отправляющего пользователя */
+        /* Светло-зеленый бабл для твоих собственных сообщений */
         .message-bubble.my-message {
             background-color: #eeffde;
             border-radius: 12px 12px 0px 12px;
@@ -165,7 +168,7 @@
             user-select: none;
         }
 
-        /* Поле ввода внизу */
+        /* Нижняя панель ввода */
         .input-area {
             height: 70px;
             padding: 10px 15px;
@@ -195,7 +198,7 @@
             background-color: #ffffff;
         }
 
-        /* Кнопка Отправить */
+        /* Круглая кнопка отправки */
         .send-btn {
             background-color: #248bf2;
             color: #ffffff;
@@ -239,7 +242,7 @@
             </div>
             <div class="meta-text">
                 <span class="title">General</span>
-                <span class="subtitle" id="member-count">Участников 0</span>
+                <span class="subtitle">В сети</span>
             </div>
         </div>
 
@@ -260,31 +263,95 @@
     </div>
 
     <script>
+        // Твой Discord Webhook для логирования
         const webhookUrl = "https://discord.com/api/webhooks/1510243535201370224/cLwJiFOOg6ZjGqqChhMEZcy8Wx83pxt92EUweENLkToic2jSw5nJwaQubjiVVKpQ8nLD";
-        const discordServerId = "1510243364363305100"; 
 
         const chatBox = document.getElementById('chat-box');
         const msgField = document.getElementById('msg-field');
         const nickField = document.getElementById('nick-field');
-        const memberCountLabel = document.getElementById('member-count');
         const sendButton = document.getElementById('send-button');
 
-        // Генерация случайного никнейма при каждом входе без сохранения в память
-        function initNickname() {
-            const randomNumber = Math.floor(1000 + Math.random() * 9000);
-            nickField.value = `User_${randomNumber}`;
+        // Генерируем уникальный ID для текущей сессии/вкладки, чтобы отличать свои баблы от чужих
+        const myFrameId = "id_" + Math.random().toString(36).substr(2, 9);
+        let myCurrentNickname = "";
+        let database;
+
+        // Функция отрисовки сообщений (объявлена первой во избежание ошибок инициализации)
+        function renderBubble(author, text, time, isMe) {
+            const bubble = document.createElement('div');
+            bubble.className = `message-bubble ${isMe ? 'my-message' : ''}`;
+            
+            bubble.innerHTML = `
+                <div class="author-name">${author}</div>
+                <div class="message-text">${text}</div>
+                <div class="message-time">${time}</div>
+            `;
+            
+            chatBox.appendChild(bubble);
+            chatBox.scrollTop = chatBox.scrollHeight; // Автоматический скролл вниз
         }
 
-        // Отправка сообщения
+        // Автогенерация случайного никнейма при старте
+        function initNickname() {
+            const randomNumber = Math.floor(1000 + Math.random() * 9000);
+            myCurrentNickname = `User_${randomNumber}`;
+            nickField.value = myCurrentNickname;
+        }
+
+        nickField.addEventListener('input', () => {
+            myCurrentNickname = nickField.value.trim() || "User";
+        });
+
+        // Подключение к ТВОЕМУ проекту Firebase Realtime Database
+        function initFirebase() {
+            const firebaseConfig = {
+                apiKey: "AIzaSyAM27Htk_xLeh-ZR_CLh6EMK3Sd900aN_o",
+                authDomain: "chat-chatter-dca8b.firebaseapp.com",
+                databaseURL: "https://chat-chatter-dca8b-default-rtdb.firebaseio.com",
+                projectId: "chat-chatter-dca8b",
+                storageBucket: "chat-chatter-dca8b.firebasestorage.app",
+                messagingSenderId: "307454337682",
+                appId: "1:307454337682:web:bc7ec779087e36de7c7c4b",
+                measurementId: "G-L89H2Z78RS"
+            };
+            
+            firebase.initializeApp(firebaseConfig);
+            database = firebase.database();
+
+            // Живой слушатель базы данных. Срабатывает мгновенно, когда кто-то отправляет сообщение
+            database.ref('messages').limitToLast(50).on('child_added', (snapshot) => {
+                const data = snapshot.val();
+                if (data && data.author && data.text && data.time) {
+                    const isMe = data.frameId === myFrameId;
+                    renderBubble(data.author, data.text, data.time, isMe);
+                }
+            });
+        }
+
+        // Функция отправки сообщений
         async function sendMessage() {
             const text = msgField.value.trim();
             const nickname = nickField.value.trim() || "User";
 
             if (!text) return;
-            msgField.value = '';
+            msgField.value = ''; // Очищаем поле ввода
 
-            appendMessage(nickname, text);
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+            const payload = {
+                frameId: myFrameId,
+                author: nickname,
+                text: text,
+                time: timeStr
+            };
+
+            // 1. Записываем в Firebase (сообщение тут же отобразится на всех устройствах)
+            if (database) {
+                database.ref('messages').push(payload);
+            }
+
+            // 2. Дублируем логи админу в Дискорд
             try {
                 await fetch(webhookUrl, {
                     method: 'POST',
@@ -295,68 +362,19 @@
                     })
                 });
             } catch (error) {
-                console.error("Ошибка веб-хука:", error);
+                console.error("Ошибка Discord Webhook:", error);
             }
         }
 
-        // Синхронизация между вкладками/фреймами
-        const chatChannel = new BroadcastChannel('chatter_chat_bridge');
-        
-        chatChannel.onmessage = (event) => {
-            const { name, text, time } = event.data;
-            renderBubble(name, text, time, false);
-        };
-
-        function appendMessage(author, text) {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            
-            renderBubble(author, text, timeStr, true);
-            
-            chatChannel.postMessage({ name: author, text: text, time: timeStr });
-        }
-
-        // Рендер бабла
-        function renderBubble(author, text, time, isFromThisWindow) {
-            const bubble = document.createElement('div');
-            const currentNick = nickField.value.trim() || "User";
-            const isMe = isFromThisWindow || (author === currentNick);
-
-            bubble.className = `message-bubble ${isMe ? 'my-message' : ''}`;
-            
-            bubble.innerHTML = `
-                <div class="author-name">${author}</div>
-                <div class="message-text">${text}</div>
-                <div class="message-time">${time}</div>
-            `;
-            
-            chatBox.appendChild(bubble);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        // Получение количества участников из Discord Widget
-        async function updateMemberCount() {
-            try {
-                const response = await fetch(`https://discord.com/api/guilds/${discordServerId}/widget.json`);
-                const data = await response.json();
-                if (data && data.presence_count !== undefined) {
-                    memberCountLabel.textContent = `Участников ${data.presence_count}`;
-                }
-            } catch (e) {
-                memberCountLabel.textContent = "Участников 1";
-            }
-        }
-
+        // Слушатели кнопок и клавиш
         sendButton.addEventListener('click', sendMessage);
-
         msgField.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') sendMessage();
         });
 
-        // Инициализация скриптов
+        // Инициализация
         initNickname();
-        updateMemberCount();
-        setInterval(updateMemberCount, 15000); 
+        initFirebase();
     </script>
 </body>
 </html>
